@@ -1,0 +1,34 @@
+grist_root_url: "https://grist.tiker.net"
+grist_doc_id: rLJPGJ9RLJ4TRVx4AxT2tW
+
+query: |
+    select *
+    from Availability_requests
+    inner join Persons on Person = Persons.id
+
+timestamp_table: Availability_requests
+timestamp_column: Last_nag
+
+cc:
+- andreask@illinois.edu
+
+subject_template: "[Academic  Appeals] Availability Needed"
+
+# Interpreted as a Jinja template, with row data available.
+# https://jinja.palletsprojects.com/en/3.0.x/templates/
+body_template: |
+
+    Dear {{ First_name }},
+
+    Thank you for serving on the Academic Appeals Committee this schoolyear. A
+    number of appeals cases need to be heard in the near future. To allow these
+    hearings to proceed, please click the following link in order to provide
+    your availability:
+
+    https://scicomp-apps.cs.illinois.edu/availability/{{ Key }}
+
+    Please provide your response by close of business tomorrow.
+
+    Thank you!
+    Andreas
+    Chair, Academic Appeals Committee

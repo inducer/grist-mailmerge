@@ -1,0 +1,32 @@
+[build-system]
+requires = [
+  "setuptools >= 40.9.0",
+  "wheel",
+]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "grist-mailmerge"
+version = "2023.1"
+authors = [
+    {name = "Andreas Kloeckner", email = "inform@tiker.net"},
+]
+description = "Email merge for Grist databases, configured by YAML"
+readme = "README.md"
+requires-python = ">=3.8"
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "License :: OSI Approved :: MIT License",
+    "Natural Language :: English",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 3",
+]
+dependencies = [
+    "pygrist_mini ~=2023.2",
+    "strictyaml ~=1.7.3",
+    "jinja2 =~3.1.2",
+]
+
+[project.scripts]
+grist-mailmerge = "grist_mailmerge.cli:main"
