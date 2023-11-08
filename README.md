@@ -13,6 +13,11 @@ Optionally, it can leave timestamps of when email was sent in that table.
 pip install grist-mailmerge
 ```
 
+or
+
+```
+pipx install grist-mailmerge
+```
 ## Use
 
 ```
