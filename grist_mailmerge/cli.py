@@ -21,7 +21,7 @@ YAML_SCHEMA = Map({
 
 
 def main():
-    parser = argparse.ArgumentParser(description='Email merge for Grist')
+    parser = argparse.ArgumentParser(description="Email merge for Grist")
     parser.add_argument("filename", metavar="FILENAME.YML")
     parser.add_argument("-n", "--dry-run", action="store_true")
     parser.add_argument("-v", "--verbose", action="store_true")
