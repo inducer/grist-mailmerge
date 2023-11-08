@@ -25,7 +25,7 @@ classifiers = [
 dependencies = [
     "pygrist_mini ~=2023.2",
     "strictyaml ~=1.7.3",
-    "jinja2 =~3.1.2",
+    "jinja2 ~=3.1.2",
 ]
 
 [project.scripts]
