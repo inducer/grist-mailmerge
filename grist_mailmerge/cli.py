@@ -2,6 +2,7 @@ import argparse
 import re
 from email.headerregistry import Address
 from email.message import EmailMessage
+from os.path import expanduser
 from subprocess import PIPE, Popen
 
 from jinja2 import Environment, StrictUndefined
@@ -26,7 +27,8 @@ def main():
     parser.add_argument("filename", metavar="FILENAME.YML")
     parser.add_argument("-n", "--dry-run", action="store_true")
     parser.add_argument("-v", "--verbose", action="store_true")
-    parser.add_argument("--api-key", metavar="FILENAME")
+    parser.add_argument("--api-key", metavar="FILENAME",
+                        default=expanduser("~/.grist-api-key"))
     parser.add_argument("--sendmail", metavar="PATH", default="/usr/bin/sendmail")
     args = parser.parse_args()
 
