@@ -1,4 +1,5 @@
 import argparse
+import re
 from email.headerregistry import Address
 from email.message import EmailMessage
 from subprocess import PIPE, Popen
@@ -50,7 +51,8 @@ def main():
     from time import time
     for row in rows:
         email = row["Email"]
-        subject = subject_template.render(row)
+        subject, _ = re.subn(
+            r"\s+", " ",subject_template.render(row))
         body = body_template.render(row).strip()
         cc = [yel.text for yel in yaml_doc["cc"]]
 

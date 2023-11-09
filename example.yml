@@ -12,7 +12,15 @@ timestamp_column: Last_nag
 cc:
 - andreask@illinois.edu
 
-subject_template: "[TODO] Availability for Appeal Hearings"
+subject_template: |
+    {% if Nag_count > 1%}
+        [TODO: REMINDER #{{ Nag_count}}]
+    {% elif Nag_count == 1%}
+        [TODO: REMINDER]
+    {% else %}
+        [TODO]
+    {% endif %}
+    Availability for Appeal Hearings: {{ Request_group_description }}
 
 # Interpreted as a Jinja template, with row data available.
 # https://jinja.palletsprojects.com/en/3.0.x/templates/
