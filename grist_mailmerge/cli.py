@@ -16,8 +16,9 @@ YAML_SCHEMA = Map({
     "query": Str(),
     "subject_template": Str(),
     "body_template": Str(),
-    Optional("timestamp_table"): Str(),
+    Optional("tracking_table"): Str(),
     Optional("timestamp_column"): Str(),
+    Optional("count_column"): Str(),
     Optional("cc"): Seq(Str()),
     })
 
@@ -47,9 +48,10 @@ def main():
 
     env = Environment(undefined=StrictUndefined)
     subject_template = env.from_string(yaml_doc["subject_template"].text)
+
     body_template = env.from_string(yaml_doc["body_template"].text)
 
-    timestamp_updates = []
+    tracking_updates = []
     from time import time
     for row in rows:
         email = row["Email"]
@@ -68,15 +70,21 @@ def main():
             print(75 * "#")
             print(msg)
 
-        if not args.dry_run:
-            if "timestamp_column" in yaml_doc:
-                timestamp_updates.append((
-                    row["id"], {yaml_doc["timestamp_column"].text: time()}))
+        row_tracking_updates = {}
+        if "timestamp_column" in yaml_doc:
+            row_tracking_updates[yaml_doc["timestamp_column"].text] = time()
+        if "count_column" in yaml_doc:
+            row_tracking_updates[yaml_doc["count_column"].text] = \
+                    row[yaml_doc["count_column"].text] + 1
 
+        if row_tracking_updates:
+            tracking_updates.append((row["id"], row_tracking_updates))
+
+        if not args.dry_run:
             with Popen([args.sendmail, "-t", "-i"], stdin=PIPE) as p:
                 p.communicate(msg.as_bytes())
 
-    if timestamp_updates:
+    if tracking_updates and not args.dry_run:
         client.patch_records(
-                yaml_doc["timestamp_table"].text,
-                timestamp_updates)
+                yaml_doc["tracking_table"].text,
+                tracking_updates)

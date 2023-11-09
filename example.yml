@@ -5,9 +5,11 @@ query: |
     select *
     from Availability_requests
     inner join Persons on Person = Persons.id
+    where not Responded
 
-timestamp_table: Availability_requests
+tracking_table: Availability_requests
 timestamp_column: Last_nag
+count_column: Nag_count
 
 cc:
 - andreask@illinois.edu
@@ -21,6 +23,7 @@ subject_template: |
         [TODO]
     {% endif %}
     Availability for Appeal Hearings: {{ Request_group_description }}
+
 
 # Interpreted as a Jinja template, with row data available.
 # https://jinja.palletsprojects.com/en/3.0.x/templates/
@@ -40,3 +43,7 @@ body_template: |
     Thank you!
     Andreas
     Chair, Academic Appeals Committee
+
+    {% if Nag_count %}
+    PS: Make these emails stop! Respond now. :)
+    {% endif %}
