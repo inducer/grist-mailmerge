@@ -12,7 +12,7 @@ timestamp_column: Last_nag
 cc:
 - andreask@illinois.edu
 
-subject_template: "[Academic  Appeals] Availability Needed"
+subject_template: "[TODO] Availability for Appeal Hearings"
 
 # Interpreted as a Jinja template, with row data available.
 # https://jinja.palletsprojects.com/en/3.0.x/templates/
