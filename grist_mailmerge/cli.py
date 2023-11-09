@@ -64,12 +64,13 @@ def main():
             print(75 * "#")
             print(msg)
 
-        if "timestamp_column" in yaml_doc:
-            timestamp_updates.append((
-                row["id"], {yaml_doc["timestamp_column"].text: time()}))
+        if not args.dry_run:
+            if "timestamp_column" in yaml_doc:
+                timestamp_updates.append((
+                    row["id"], {yaml_doc["timestamp_column"].text: time()}))
 
-        with Popen([args.sendmail, "-t", "-i"], stdin=PIPE) as p:
-            p.communicate(msg.as_bytes())
+            with Popen([args.sendmail, "-t", "-i"], stdin=PIPE) as p:
+                p.communicate(msg.as_bytes())
 
     if timestamp_updates:
         client.patch_records(
