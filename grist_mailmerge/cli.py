@@ -56,7 +56,7 @@ def main():
     for row in rows:
         email = row["Email"]
         subject, _ = re.subn(
-            r"\s+", " ",subject_template.render(row))
+            r"\s+", " ", subject_template.render(row))
         body = body_template.render(row).strip()
         cc = [yel.text for yel in yaml_doc["cc"]]
 
