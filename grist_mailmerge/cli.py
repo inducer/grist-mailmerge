@@ -1,26 +1,77 @@
 import argparse
+import ast
 import re
 from email.headerregistry import Address
 from email.message import EmailMessage
+from functools import partial
 from os.path import expanduser
 from subprocess import PIPE, Popen
+from typing import Any, Optional as TOptional
 
 from jinja2 import Environment, StrictUndefined
 from pygrist_mini import GristClient
-from strictyaml import Map, Optional, Seq, Str, load
+from strictyaml import Map, MapPattern, Optional, Seq, Str, load
 
+
+_EMAIL_ADDR = Map({
+    Optional("name"): Str(),
+    "email": Str(),
+})
 
 YAML_SCHEMA = Map({
     "grist_root_url": Str(),
     "grist_doc_id": Str(),
     "query": Str(),
-    "subject_template": Str(),
-    "body_template": Str(),
-    Optional("tracking_table"): Str(),
-    Optional("timestamp_column"): Str(),
-    Optional("count_column"): Str(),
-    Optional("cc"): Seq(Str()),
+    "subject": Str(),
+    "body": Str(),
+    Optional("update"): Map({
+        "table": Str(),
+        "fields": MapPattern(Str(), Str()),
+    }),
+    Optional("to"): Seq(_EMAIL_ADDR),
+    Optional("cc"): Seq(_EMAIL_ADDR),
     })
+
+
+def convert_email(expand, email_yml):
+    email = expand(email_yml["email"].text)
+    if email_yml["name"] is None:
+        return Address(addr_spec=email)
+    else:
+        return Address(
+            expand(email_yml["name"].text),
+            addr_spec=email)
+
+
+def convert_emails(expand, emails_yml):
+    return tuple(
+        convert_email(expand, email_yml)
+        for email_yml in emails_yml)
+
+
+# based on https://stackoverflow.com/a/76636602
+def exec_with_return(
+        code: str, globals: TOptional[dict], locals: TOptional[dict]) -> Any:
+    if locals is None:
+        locals = {}
+    a = ast.parse(code)
+    last_expression = None
+    if a.body:
+        if isinstance(a_last := a.body[-1], ast.Expr):
+            last_expression = ast.unparse(a.body.pop())
+        elif isinstance(a_last, ast.Assign):
+            last_expression = ast.unparse(a_last.targets[0])
+        elif isinstance(a_last, (ast.AnnAssign, ast.AugAssign)):
+            last_expression = ast.unparse(a_last.target)
+    exec(ast.unparse(a), globals, locals)
+    if last_expression:
+        return eval(last_expression, globals, locals)
+
+
+def format_timestamp(tstamp: float, format: str = "%c") -> str:
+    import datetime
+    dt = datetime.datetime.fromtimestamp(tstamp)
+    return dt.strftime(format)
 
 
 def main():
@@ -47,44 +98,57 @@ def main():
     rows = client.sql(yaml_doc["query"].text)
 
     env = Environment(undefined=StrictUndefined)
-    subject_template = env.from_string(yaml_doc["subject_template"].text)
+    env.filters["format_timestamp"] = format_timestamp
 
-    body_template = env.from_string(yaml_doc["body_template"].text)
+    def expand_template(context, tpl):
+        return env.from_string(tpl).render(context)
 
-    tracking_updates = []
-    from time import time
+    subject_template = env.from_string(yaml_doc["subject"].text)
+    body_template = env.from_string(yaml_doc["body"].text)
+
+    updates = []
     for row in rows:
-        email = row["Email"]
+        # {{{ compute row updates
+
+        row_updates = {}
+        if yaml_doc["update"] is not None:
+            for field, code in yaml_doc["update"]["fields"].data.items():
+                row_updates[field] = exec_with_return(code, globals=row, locals=None)
+        if row_updates:
+            updates.append((row["id"], row_updates))
+
+        if args.verbose or args.dry_run:
+            print(row_updates)
+
+        # }}}
+
+        exp_context = row.copy()
+        for field, val in row_updates.items():
+            exp_context[f"updated_{field}"] = val
+
         subject, _ = re.subn(
-            r"\s+", " ", subject_template.render(row))
-        body = body_template.render(row).strip()
-        cc = [yel.text for yel in yaml_doc["cc"]]
+            r"\s+", " ", subject_template.render(exp_context))
+        body = body_template.render(exp_context).strip()
+
+        expand = partial(expand_template, exp_context)
 
         msg = EmailMessage()
         msg["Subject"] = subject
-        msg["To"] = Address(row["Full_name"], addr_spec=email)
-        msg["Cc"] = tuple([Address(addr_spec=cc) for cc in cc])
+        msg["To"] = convert_emails(expand, yaml_doc["to"])
+        msg["Cc"] = convert_emails(expand, yaml_doc["cc"])
         msg.set_content(body)
 
         if args.dry_run or args.verbose:
             print(75 * "#")
             print(msg)
 
-        row_tracking_updates = {}
-        if "timestamp_column" in yaml_doc:
-            row_tracking_updates[yaml_doc["timestamp_column"].text] = time()
-        if "count_column" in yaml_doc:
-            row_tracking_updates[yaml_doc["count_column"].text] = \
-                    row[yaml_doc["count_column"].text] + 1
-
-        if row_tracking_updates:
-            tracking_updates.append((row["id"], row_tracking_updates))
-
         if not args.dry_run:
             with Popen([args.sendmail, "-t", "-i"], stdin=PIPE) as p:
                 p.communicate(msg.as_bytes())
 
-    if tracking_updates and not args.dry_run:
+    if yaml_doc["update"] is not None and not args.dry_run:
         client.patch_records(
-                yaml_doc["tracking_table"].text,
-                tracking_updates)
+                yaml_doc["update"]["table"].text,
+                updates)
+
+# vim: foldmethod=marker

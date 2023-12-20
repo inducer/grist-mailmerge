@@ -1,20 +1,28 @@
 grist_root_url: "https://grist.tiker.net"
-grist_doc_id: rLJPGJ9RLJ4TRVx4AxT2tW
+grist_doc_id: DOC_ID
+
+# All text is interpreted as a Jinja template, with row data available.
+# https://jinja.palletsprojects.com/en/3.0.x/templates/
 
 query: |
     select *
     from Availability_requests
     inner join Persons on Person = Persons.id
-    where not Responded
+    where Request_group = 4 and not Responded
+    and (
+        (Response_deadline is not null and Response_deadline < unixepoch('now'))
+        or Last_nag is null)
 
-tracking_table: Availability_requests
-timestamp_column: Last_nag
-count_column: Nag_count
-
+to:
+-
+    name: "{{ Full_name }}"
+    email: "{{ Email }}"
 cc:
-- andreask@illinois.edu
+- 
+    name: Andreas Kloeckner
+    email: andreask@illinois.edu
 
-subject_template: |
+subject: |
     {% if Nag_count > 1%}
         [TODO: REMINDER #{{ Nag_count}}]
     {% elif Nag_count == 1%}
@@ -24,26 +32,61 @@ subject_template: |
     {% endif %}
     Availability for Appeal Hearings: {{ Request_group_description }}
 
-
-# Interpreted as a Jinja template, with row data available.
-# https://jinja.palletsprojects.com/en/3.0.x/templates/
-body_template: |
+body: |
 
     Dear {{ First_name }},
 
-    Thank you for serving on the Academic Appeals Committee this schoolyear. A
-    number of appeals cases need to be heard in the near future. To allow these
-    hearings to proceed, please click the following link in order to provide
-    your availability:
+    {% if "Committee" in Person_Category -%}
+    Thank you for serving on the Academic Appeals Committee this schoolyear.
+    A number of appeals cases need to be heard in the near future. 
+    {%- else -%}
+    One or more appeals cases involving you need to be heard in the near future.
+    {% endif -%}
+    To allow these hearings to proceed, please click the following link in
+    order to provide your availability:
 
     https://scicomp-apps.cs.illinois.edu/availability/{{ Key }}
 
-    Please provide your response by close of business tomorrow.
+    {% if Nag_count %}
+    To avoid making my job harder than it already is:
+    {% endif %}
+    Please provide your response by {{ updated_Response_deadline | format_timestamp("%B %d %I:%M %p") }}
+    at the latest.
 
+    {% if not Nag_count %}
     Thank you!
+    {% endif %}
     Andreas
     Chair, Academic Appeals Committee
 
     {% if Nag_count %}
     PS: Make these emails stop! Respond now. :)
     {% endif %}
+
+update:
+    table: Availability_requests
+    fields:
+        Nag_count: |
+            Nag_count + 1 if Nag_count is not None else 1
+        Last_nag: |
+            from time import time
+            time()
+        Response_deadline: |
+
+            def date_by_adding_business_days(from_date, add_days):
+                import datetime
+                business_days_to_add = add_days
+                current_date = from_date
+                while business_days_to_add > 0:
+                    current_date += datetime.timedelta(days=1)
+                    weekday = current_date.weekday()
+                    if weekday >= 5: # sunday = 6
+                        continue
+                    business_days_to_add -= 1
+                return current_date
+
+            import datetime
+            prev_deadline = datetime.datetime.fromtimestamp(Response_deadline)
+            datetime.datetime.combine(
+                date_by_adding_business_days(prev_deadline.date(), 2),
+                prev_deadline.time()).timestamp()
