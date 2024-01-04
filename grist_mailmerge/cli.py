@@ -52,9 +52,9 @@ def convert_emails(expand, emails_yml):
 
 # based on https://stackoverflow.com/a/76636602
 def exec_with_return(
-        code: str, globals: TOptional[dict], locals: TOptional[dict]) -> Any:
-    if locals is None:
-        locals = {}
+        code: str, location: str, globals: TOptional[dict],
+        locals: TOptional[dict] = None,
+        ) -> Any:
     a = ast.parse(code)
     last_expression = None
     if a.body:
@@ -64,7 +64,8 @@ def exec_with_return(
             last_expression = ast.unparse(a_last.targets[0])
         elif isinstance(a_last, (ast.AnnAssign, ast.AugAssign)):
             last_expression = ast.unparse(a_last.target)
-    exec(ast.unparse(a), globals, locals)
+    code = compile(ast.unparse(a), location, "exec")
+    exec(code, globals, locals)
     if last_expression:
         return eval(last_expression, globals, locals)
 
@@ -116,7 +117,9 @@ def main():
         row_updates = {}
         if yaml_doc["update"] is not None:
             for field, code in yaml_doc["update"]["fields"].data.items():
-                row_updates[field] = exec_with_return(code, globals=row, locals=None)
+                globals = dict(row)
+                row_updates[field] = exec_with_return(
+                    code, f"<update for '{field}'>", globals=globals)
         if row_updates:
             updates.append((row["id"], row_updates))
 
