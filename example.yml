@@ -8,7 +8,7 @@ query: |
     select *
     from Availability_requests
     inner join Persons on Person = Persons.id
-    where Request_group = 4 and not Responded
+    where Request_group = 4 and Responded is null
     and (
         (Response_deadline is not null and Response_deadline < unixepoch('now'))
         or Last_nag is null)
