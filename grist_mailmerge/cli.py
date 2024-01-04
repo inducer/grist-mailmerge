@@ -4,7 +4,8 @@ import re
 from email.headerregistry import Address
 from email.message import EmailMessage
 from functools import partial
-from os.path import expanduser
+import os
+import sys
 from subprocess import PIPE, Popen
 from typing import Any, Optional as TOptional
 
@@ -80,9 +81,11 @@ def main():
     parser.add_argument("-n", "--dry-run", action="store_true")
     parser.add_argument("-v", "--verbose", action="store_true")
     parser.add_argument("--api-key", metavar="FILENAME",
-                        default=expanduser("~/.grist-api-key"))
+                        default=os.path.expanduser("~/.grist-api-key"))
     parser.add_argument("--sendmail", metavar="PATH", default="/usr/bin/sendmail")
     args = parser.parse_args()
+
+    sys.path.append(os.path.dirname(os.path.abspath(args.filename)))
 
     with open(args.filename, "r") as inf:
         yaml_doc = load(inf.read(), YAML_SCHEMA)
