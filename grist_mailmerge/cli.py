@@ -1,11 +1,11 @@
 import argparse
 import ast
+import os
 import re
+import sys
 from email.headerregistry import Address
 from email.message import EmailMessage
 from functools import partial
-import os
-import sys
 from subprocess import PIPE, Popen
 from typing import Any, Optional as TOptional
 
