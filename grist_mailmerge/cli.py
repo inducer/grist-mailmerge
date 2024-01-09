@@ -180,8 +180,8 @@ def main():
         if args.dry_run or args.verbose:
             print(75 * "#")
             print(f"Subject: {subject}")
-            print(f"To: {", ".join(str(addr) for addr in to)}")
-            print(f"Cc: {", ".join(str(addr) for addr in cc)}")
+            print(f"To: {', '.join(str(addr) for addr in to)}")
+            print(f"Cc: {', '.join(str(addr) for addr in cc)}")
             print(30 * "-")
             print(body)
 
