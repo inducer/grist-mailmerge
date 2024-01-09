@@ -23,6 +23,7 @@ _EMAIL_ADDR = Map({
 YAML_SCHEMA = Map({
     "grist_root_url": Str(),
     "grist_doc_id": Str(),
+    Optional("parameters"): Seq(Str()),
     "query": Str(),
     "subject": Str(),
     "body": Str(),
@@ -90,8 +91,12 @@ def format_timestamp(tstamp: float, format: str = "%c") -> str:
 
 
 def main():
+    env = Environment(undefined=StrictUndefined)
+    env.filters["format_timestamp"] = format_timestamp
+
     parser = argparse.ArgumentParser(description="Email merge for Grist")
     parser.add_argument("filename", metavar="FILENAME.YML")
+    parser.add_argument("parameters", metavar="PAR", nargs="*")
     parser.add_argument("-n", "--dry-run", action="store_true")
     parser.add_argument("-v", "--verbose", action="store_true")
     parser.add_argument("--api-key", metavar="FILENAME",
@@ -112,10 +117,24 @@ def main():
             api_key,
             yaml_doc["grist_doc_id"].text)
 
-    rows = client.sql(yaml_doc["query"].text)
+    query = yaml_doc["query"].text
 
-    env = Environment(undefined=StrictUndefined)
-    env.filters["format_timestamp"] = format_timestamp
+    if yaml_doc["parameters"] is not None:
+        nrequired = len(yaml_doc["parameters"])
+        nsupplied = len(args.parameters)
+        if nrequired != nsupplied:
+            raise ValueError(
+                f"{nrequired} parameters required, {nsupplied} supplied")
+
+        param_values = {name.text: value
+                        for name, value in zip(yaml_doc["parameters"],
+                                               args.parameters,
+                                               strict=True)}
+        query = env.from_string(query).render(param_values)
+    else:
+        param_values = {}
+
+    rows = client.sql(query)
 
     def expand_template(context, tpl):
         return env.from_string(tpl).render(context)
@@ -141,7 +160,8 @@ def main():
 
         # }}}
 
-        exp_context = row.copy()
+        exp_context = param_values.copy()
+        exp_context.update(row)
         for field, val in row_updates.items():
             exp_context[f"updated_{field}"] = val
 
