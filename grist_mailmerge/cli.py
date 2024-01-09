@@ -11,12 +11,13 @@ from typing import Any, Optional as TOptional
 
 from jinja2 import Environment, StrictUndefined
 from pygrist_mini import GristClient
-from strictyaml import Map, MapPattern, Optional, Seq, Str, load
+from strictyaml import Bool, Map, MapPattern, Optional, Seq, Str, load
 
 
 _EMAIL_ADDR = Map({
     Optional("name"): Str(),
     "email": Str(),
+    Optional("semicolon_separated"): Bool(),
 })
 
 YAML_SCHEMA = Map({
@@ -35,19 +36,31 @@ YAML_SCHEMA = Map({
 
 
 def convert_email(expand, email_yml):
-    email = expand(email_yml["email"].text)
-    if email_yml["name"] is None:
-        return Address(addr_spec=email)
+    if email_yml.get("semicolon_separated", False):
+        emails = expand(email_yml["email"].text).split(";")
+        if "name" not in email_yml:
+            return tuple(Address(addr_spec=email) for email in emails)
+        else:
+            names = expand(email_yml["name"].text).split(";")
+            return tuple(
+                Address(name, addr_spec=email)
+                for name, email in zip(names, emails, strict=True))
+
     else:
-        return Address(
-            expand(email_yml["name"].text),
-            addr_spec=email)
+        email = expand(email_yml["email"].text)
+        if "name" not in email_yml:
+            return (Address(addr_spec=email),)
+        else:
+            return (Address(
+                expand(email_yml["name"].text),
+                addr_spec=email),)
 
 
 def convert_emails(expand, emails_yml):
     return tuple(
-        convert_email(expand, email_yml)
-        for email_yml in emails_yml)
+        addr
+        for email_yml in emails_yml
+        for addr in convert_email(expand, email_yml))
 
 
 # based on https://stackoverflow.com/a/76636602
