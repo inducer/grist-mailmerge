@@ -153,13 +153,17 @@ def main():
 
         msg = EmailMessage()
         msg["Subject"] = subject
-        msg["To"] = convert_emails(expand, yaml_doc["to"])
-        msg["Cc"] = convert_emails(expand, yaml_doc["cc"])
+        to = msg["To"] = convert_emails(expand, yaml_doc["to"])
+        cc = msg["Cc"] = convert_emails(expand, yaml_doc["cc"])
         msg.set_content(body)
 
         if args.dry_run or args.verbose:
             print(75 * "#")
-            print(msg)
+            print(f"Subject: {subject}")
+            print(f"To: {", ".join(str(addr) for addr in to)}")
+            print(f"Cc: {", ".join(str(addr) for addr in cc)}")
+            print(30 * "-")
+            print(body)
 
         if not args.dry_run:
             with Popen([args.sendmail, "-t", "-i"], stdin=PIPE) as p:
