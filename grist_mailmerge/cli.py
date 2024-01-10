@@ -119,7 +119,7 @@ def main():
 
     query = yaml_doc["query"].text
 
-    if yaml_doc["parameters"] is not None:
+    if "parameters" in yaml_doc:
         nrequired = len(yaml_doc["parameters"])
         nsupplied = len(args.parameters)
         if nrequired != nsupplied:
@@ -147,7 +147,7 @@ def main():
         # {{{ compute row updates
 
         row_updates = {}
-        if yaml_doc["update"] is not None:
+        if "update" in yaml_doc:
             for field, code in yaml_doc["update"]["fields"].data.items():
                 globals = dict(row)
                 row_updates[field] = exec_with_return(
@@ -189,7 +189,7 @@ def main():
             with Popen([args.sendmail, "-t", "-i"], stdin=PIPE) as p:
                 p.communicate(msg.as_bytes())
 
-    if yaml_doc["update"] is not None and not args.dry_run:
+    if "update" in yaml_doc and not args.dry_run:
         client.patch_records(
                 yaml_doc["update"]["table"].text,
                 updates)
