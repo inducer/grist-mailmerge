@@ -31,6 +31,12 @@ YAML_SCHEMA = Map({
         "table": Str(),
         "fields": MapPattern(Str(), Str()),
     }),
+    Optional("insert"): Seq(
+        Map({
+            "table": Str(),
+            "fields": MapPattern(Str(), Str()),
+        }),
+    ),
     Optional("to"): Seq(_EMAIL_ADDR),
     Optional("cc"): Seq(_EMAIL_ADDR),
     })
@@ -146,8 +152,26 @@ def main():
     subject_template = env.from_string(yaml_doc["subject"].text)
     body_template = env.from_string(yaml_doc["body"].text)
 
+    table_to_inserts = {}
     updates = []
+
     for row in rows:
+        # {{{ compute inserts
+
+        if "insert" in yaml_doc:
+            for insert_descr in yaml_doc["insert"]:
+                tbl_name = insert_descr["table"].text
+                new_record = {}
+                for field, code in insert_descr["fields"].data.items():
+                    globals = dict(row)
+                    new_record[field] = exec_with_return(
+                        code, f"<insert for '{tbl_name}.{field}'>", globals=globals)
+                table_to_inserts.setdefault(tbl_name, []).append(new_record)
+                if args.verbose or args.dry_run:
+                    print(f"INSERT {insert_descr["table"].text}", new_record)
+
+        # }}}
+
         # {{{ compute row updates
 
         row_updates = {}
@@ -160,7 +184,7 @@ def main():
             updates.append((row["id"], row_updates))
 
         if args.verbose or args.dry_run:
-            print(row_updates)
+            print("UPDATE", row_updates)
 
         # }}}
 
@@ -193,7 +217,11 @@ def main():
             with Popen([args.sendmail, "-t", "-i"], stdin=PIPE) as p:
                 p.communicate(msg.as_bytes())
 
-    if "update" in yaml_doc and not args.dry_run:
+    if table_to_inserts and not args.dry_run:
+        for tbl, inserts in table_to_inserts.items():
+            client.add_records(tbl, inserts)
+
+    if updates and not args.dry_run:
         client.patch_records(
                 yaml_doc["update"]["table"].text,
                 updates)
