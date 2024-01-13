@@ -38,17 +38,21 @@ YAML_SCHEMA = Map({
 
 def convert_email(expand, email_yml):
     if email_yml.get("semicolon_separated", False):
-        emails = expand(email_yml["email"].text).split(";")
+        emails = [email.strip()
+            for email in expand(email_yml["email"].text).split(";")]
         if "name" not in email_yml:
-            return tuple(Address(addr_spec=email) for email in emails)
+            return tuple(Address(addr_spec=email) for email in emails if email)
         else:
             names = expand(email_yml["name"].text).split(";")
             return tuple(
                 Address(name, addr_spec=email)
-                for name, email in zip(names, emails, strict=True))
+                for name, email in zip(names, emails, strict=True) if email)
 
     else:
         email = expand(email_yml["email"].text)
+        if not email:
+            return ()
+
         if "name" not in email_yml:
             return (Address(addr_spec=email),)
         else:
