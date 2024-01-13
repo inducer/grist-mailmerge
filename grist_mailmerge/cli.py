@@ -168,7 +168,7 @@ def main():
                         code, f"<insert for '{tbl_name}.{field}'>", globals=globals)
                 table_to_inserts.setdefault(tbl_name, []).append(new_record)
                 if args.verbose or args.dry_run:
-                    print(f"INSERT {insert_descr["table"].text}", new_record)
+                    print(f"INSERT {insert_descr['table'].text}", new_record)
 
         # }}}
 
