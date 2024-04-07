@@ -88,8 +88,8 @@ def exec_with_return(
             last_expression = ast.unparse(a_last.targets[0])
         elif isinstance(a_last, (ast.AnnAssign, ast.AugAssign)):
             last_expression = ast.unparse(a_last.target)
-    code = compile(ast.unparse(a), location, "exec")
-    exec(code, globals, locals)
+    compiled_code = compile(ast.unparse(a), location, "exec")
+    exec(compiled_code, globals, locals)
     if last_expression:
         return eval(last_expression, globals, locals)
 
