@@ -192,6 +192,10 @@ def main():
         exp_context.update(row)
         for field, val in row_updates.items():
             exp_context[f"updated_{field}"] = val
+        for table, inserts in table_to_inserts.items():
+            for ins_num, insert in enumerate(inserts):
+                for field, val in insert.items():
+                    exp_context[f"inserted_{table}_{ins_num}_{field}"] = val
 
         subject, _ = re.subn(
             r"\s+", " ", subject_template.render(exp_context))
