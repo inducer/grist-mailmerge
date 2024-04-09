@@ -7,7 +7,7 @@ from email.headerregistry import Address
 from email.message import EmailMessage
 from functools import partial
 from subprocess import PIPE, Popen
-from typing import Any, Optional as TOptional
+from typing import Any, Dict, List, Optional as TOptional, Tuple
 
 from jinja2 import Environment, StrictUndefined
 from pygrist_mini import GristClient
@@ -152,8 +152,8 @@ def main():
     subject_template = env.from_string(yaml_doc["subject"].text)
     body_template = env.from_string(yaml_doc["body"].text)
 
-    table_to_inserts = {}
-    updates = []
+    table_to_inserts: Dict[str, List[Dict[str, Any]]] = {}
+    updates: List[Tuple[str, Any]] = []
 
     for row in rows:
         # {{{ compute inserts
@@ -174,7 +174,7 @@ def main():
 
         # {{{ compute row updates
 
-        row_updates = {}
+        row_updates: Dict[str, Any] = {}
         if "update" in yaml_doc:
             for field, code in yaml_doc["update"]["fields"].data.items():
                 globals = dict(row)
