@@ -158,6 +158,8 @@ def main():
     for row in rows:
         # {{{ compute inserts
 
+        row_table_to_inserts: Dict[str, List[Dict[str, Any]]] = {}
+
         if "insert" in yaml_doc:
             for insert_descr in yaml_doc["insert"]:
                 tbl_name = insert_descr["table"].text
@@ -166,6 +168,7 @@ def main():
                     globals = dict(row)
                     new_record[field] = exec_with_return(
                         code, f"<insert for '{tbl_name}.{field}'>", globals=globals)
+                row_table_to_inserts.setdefault(tbl_name, []).append(new_record)
                 table_to_inserts.setdefault(tbl_name, []).append(new_record)
                 if args.verbose or args.dry_run:
                     print(f"INSERT {insert_descr['table'].text}", new_record)
@@ -190,9 +193,11 @@ def main():
 
         exp_context = param_values.copy()
         exp_context.update(row)
+
         for field, val in row_updates.items():
             exp_context[f"updated_{field}"] = val
-        for table, inserts in table_to_inserts.items():
+
+        for table, inserts in row_table_to_inserts.items():
             for ins_num, insert in enumerate(inserts):
                 for field, val in insert.items():
                     exp_context[f"inserted_{table}_{ins_num}_{field}"] = val
