@@ -5,7 +5,7 @@ Via the document ID and SQL query, point at data in a
 [Grist](https://github.com/gristlabs/grist-core) document. Each row in that
 document must have `Email` and `Full_name` columns.
 
-Optionally, it insert or update records in the database based on the
+Optionally, it inserts or update records in the database based on the
 data processed.
 
 ## Install
