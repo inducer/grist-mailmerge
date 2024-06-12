@@ -3,6 +3,7 @@ import ast
 import os
 import re
 import sys
+from datetime import timezone
 from email.headerregistry import Address
 from email.message import EmailMessage
 from functools import partial
@@ -39,6 +40,8 @@ YAML_SCHEMA = Map({
     ),
     Optional("to"): Seq(_EMAIL_ADDR),
     Optional("cc"): Seq(_EMAIL_ADDR),
+    Optional("cc"): Seq(_EMAIL_ADDR),
+    Optional("timezone"): Str(),
     })
 
 
@@ -94,16 +97,19 @@ def exec_with_return(
         return eval(last_expression, globals, locals)
 
 
-def format_timestamp(tstamp: float, format: str = "%c") -> str:
+def format_timestamp(
+            tstamp: float,
+            format: str = "%c",
+            timezone: TOptional[timezone] = None
+        ) -> str:
     import datetime
     dt = datetime.datetime.fromtimestamp(tstamp)
+    if timezone is not None:
+        dt = dt.astimezone(timezone)
     return dt.strftime(format)
 
 
 def main():
-    env = Environment(undefined=StrictUndefined)
-    env.filters["format_timestamp"] = format_timestamp
-
     parser = argparse.ArgumentParser(description="Email merge for Grist")
     parser.add_argument("filename", metavar="FILENAME.YML")
     parser.add_argument("parameters", metavar="PAR", nargs="*")
@@ -122,6 +128,18 @@ def main():
 
     with open(args.api_key, "r") as inf:
         api_key = inf.read().strip()
+
+    env = Environment(undefined=StrictUndefined)
+    if "timezone" in yaml_doc:
+        from zoneinfo import ZoneInfo
+        from_ts = partial(
+                    format_timestamp,
+                    timezone=ZoneInfo(yaml_doc["timezone"].text))
+    else:
+        from warnings import warn
+        warn("'timezone' key not specified, timestamps will be local")
+        from_ts = format_timestamp
+    env.filters["format_timestamp"] = from_ts
 
     client = GristClient(
             yaml_doc["grist_root_url"].text,
