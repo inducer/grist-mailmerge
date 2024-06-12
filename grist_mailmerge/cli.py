@@ -108,6 +108,7 @@ def main():
     parser.add_argument("filename", metavar="FILENAME.YML")
     parser.add_argument("parameters", metavar="PAR", nargs="*")
     parser.add_argument("-n", "--dry-run", action="store_true")
+    parser.add_argument("--no-email", action="store_true")
     parser.add_argument("-v", "--verbose", action="store_true")
     parser.add_argument("--api-key", metavar="FILENAME",
                         default=os.path.expanduser("~/.grist-api-key"))
@@ -225,7 +226,7 @@ def main():
             print(30 * "-")
             print(body)
 
-        if not args.dry_run:
+        if not args.dry_run and not args.no_email:
             with Popen([args.sendmail, "-t", "-i"], stdin=PIPE) as p:
                 p.communicate(msg.as_bytes())
 
