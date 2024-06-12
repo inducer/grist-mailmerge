@@ -155,7 +155,10 @@ def main():
     table_to_inserts: Dict[str, List[Dict[str, Any]]] = {}
     updates: List[Tuple[str, Any]] = []
 
+    nrows = 0
     for row in rows:
+        nrows += 1
+
         # {{{ compute inserts
 
         row_table_to_inserts: Dict[str, List[Dict[str, Any]]] = {}
@@ -225,6 +228,9 @@ def main():
         if not args.dry_run:
             with Popen([args.sendmail, "-t", "-i"], stdin=PIPE) as p:
                 p.communicate(msg.as_bytes())
+
+    if args.verbose:
+        print(f"{nrows} rows considered.")
 
     if table_to_inserts and not args.dry_run:
         for tbl, inserts in table_to_inserts.items():
