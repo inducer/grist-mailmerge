@@ -1,19 +1,24 @@
+from __future__ import annotations
+
 import argparse
 import ast
 import os
 import re
 import sys
-from datetime import timezone
 from email.headerregistry import Address
 from email.message import EmailMessage
 from functools import partial
 from subprocess import PIPE, Popen
-from typing import Any, Dict, List, Optional as TOptional, Tuple
-from zoneinfo import ZoneInfo
+from typing import TYPE_CHECKING, Any
 
 from jinja2 import Environment, StrictUndefined
 from pygrist_mini import GristClient
 from strictyaml import Bool, Map, MapPattern, Optional, Seq, Str, load
+from zoneinfo import ZoneInfo
+
+
+if TYPE_CHECKING:
+    from datetime import timezone
 
 
 UTC  = ZoneInfo("UTC")
@@ -83,8 +88,8 @@ def convert_emails(expand, emails_yml):
 
 # based on https://stackoverflow.com/a/76636602
 def exec_with_return(
-        code: str, location: str, globals: TOptional[dict],
-        locals: TOptional[dict] = None,
+        code: str, location: str, globals: dict | None,
+        locals: dict | None = None,
         ) -> Any:
     a = ast.parse(code)
     last_expression = None
@@ -113,7 +118,7 @@ def format_date_timestamp(
 def format_timestamp(
             tstamp: float,
             format: str = "%c",
-            timezone: TOptional[timezone] = None
+            timezone: timezone | None = None
         ) -> str:
     import datetime
     dt = datetime.datetime.fromtimestamp(tstamp, tz=timezone)
@@ -134,10 +139,10 @@ def main():
 
     sys.path.append(os.path.dirname(os.path.abspath(args.filename)))
 
-    with open(args.filename, "r") as inf:
+    with open(args.filename) as inf:
         yaml_doc = load(inf.read(), YAML_SCHEMA)
 
-    with open(args.api_key, "r") as inf:
+    with open(args.api_key) as inf:
         api_key = inf.read().strip()
 
     env = Environment(undefined=StrictUndefined)
@@ -148,7 +153,7 @@ def main():
                     timezone=ZoneInfo(yaml_doc["timezone"].text))
     else:
         from warnings import warn
-        warn("'timezone' key not specified, timestamps will be local")
+        warn("'timezone' key not specified, timestamps will be local", stacklevel=1)
         from_ts = format_timestamp
     env.filters["format_timestamp"] = from_ts
     env.filters["format_date_timestamp"] = format_date_timestamp
@@ -183,8 +188,8 @@ def main():
     subject_template = env.from_string(yaml_doc["subject"].text)
     body_template = env.from_string(yaml_doc["body"].text)
 
-    table_to_inserts: Dict[str, List[Dict[str, Any]]] = {}
-    updates: List[Tuple[str, Any]] = []
+    table_to_inserts: dict[str, list[dict[str, Any]]] = {}
+    updates: list[tuple[str, Any]] = []
 
     nrows = 0
     for row in rows:
@@ -192,7 +197,7 @@ def main():
 
         # {{{ compute inserts
 
-        row_table_to_inserts: Dict[str, List[Dict[str, Any]]] = {}
+        row_table_to_inserts: dict[str, list[dict[str, Any]]] = {}
 
         if "insert" in yaml_doc:
             for insert_descr in yaml_doc["insert"]:
@@ -211,7 +216,7 @@ def main():
 
         # {{{ compute row updates
 
-        row_updates: Dict[str, Any] = {}
+        row_updates: dict[str, Any] = {}
         if "update" in yaml_doc:
             for field, code in yaml_doc["update"]["fields"].data.items():
                 globals = dict(row)
