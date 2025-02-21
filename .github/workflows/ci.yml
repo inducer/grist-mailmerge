@@ -8,19 +8,15 @@ on:
         - cron:  '17 3 * * 0'
 
 jobs:
-    flake8:
+    ruff:
         runs-on: ubuntu-latest
         steps:
         -   uses: actions/checkout@v3
         -
             uses: actions/setup-python@v4
-            with:
-                # limit to 3.11 for
-                # https://github.com/zheller/flake8-quotes/issues/117
-                python-version: '3.11'
         -   name: "Main Script"
             run: |
-                pip install flake8 flake8-quotes flake8-bugbear flake8-isort
-                flake8 grist_mailmerge
+                pipx install ruff
+                ruff check
 
 # vim: sw=4
