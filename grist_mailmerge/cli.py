@@ -116,9 +116,7 @@ def format_timestamp(
             timezone: TOptional[timezone] = None
         ) -> str:
     import datetime
-    dt = datetime.datetime.fromtimestamp(tstamp)
-    if timezone is not None:
-        dt = dt.astimezone(timezone)
+    dt = datetime.datetime.fromtimestamp(tstamp, tz=timezone)
     return dt.strftime(format)
 
 
