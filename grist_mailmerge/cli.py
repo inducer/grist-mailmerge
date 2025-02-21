@@ -9,10 +9,14 @@ from email.message import EmailMessage
 from functools import partial
 from subprocess import PIPE, Popen
 from typing import Any, Dict, List, Optional as TOptional, Tuple
+from zoneinfo import ZoneInfo
 
 from jinja2 import Environment, StrictUndefined
 from pygrist_mini import GristClient
 from strictyaml import Bool, Map, MapPattern, Optional, Seq, Str, load
+
+
+UTC  = ZoneInfo("UTC")
 
 
 _EMAIL_ADDR = Map({
@@ -97,6 +101,15 @@ def exec_with_return(
         return eval(last_expression, globals, locals)
 
 
+def format_date_timestamp(
+            tstamp: float,
+            format: str = "%Y-%m-%d",
+        ) -> str:
+    import datetime
+    dt = datetime.datetime.fromtimestamp(tstamp, tz=UTC).date()
+    return dt.strftime(format)
+
+
 def format_timestamp(
             tstamp: float,
             format: str = "%c",
@@ -140,6 +153,7 @@ def main():
         warn("'timezone' key not specified, timestamps will be local")
         from_ts = format_timestamp
     env.filters["format_timestamp"] = from_ts
+    env.filters["format_date_timestamp"] = format_date_timestamp
 
     client = GristClient(
             yaml_doc["grist_root_url"].text,
