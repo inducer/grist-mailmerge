@@ -49,7 +49,6 @@ YAML_SCHEMA = Map({
     ),
     Optional("to"): Seq(_EMAIL_ADDR),
     Optional("cc"): Seq(_EMAIL_ADDR),
-    Optional("cc"): Seq(_EMAIL_ADDR),
     Optional("timezone"): Str(),
     })
 
