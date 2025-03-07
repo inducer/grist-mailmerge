@@ -224,7 +224,7 @@ def main():
         if row_updates:
             updates.append((row["id"], row_updates))
 
-        if args.verbose or args.dry_run:
+        if row_updates and (args.verbose or args.dry_run):
             print("UPDATE", row_updates)
 
         # }}}
