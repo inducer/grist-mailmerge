@@ -49,6 +49,7 @@ YAML_SCHEMA = Map({
     ),
     Optional("to"): Seq(_EMAIL_ADDR),
     Optional("cc"): Seq(_EMAIL_ADDR),
+    Optional("bcc"): Seq(_EMAIL_ADDR),
     Optional("timezone"): Str(),
     })
 
@@ -242,6 +243,7 @@ def main():
         msg["Subject"] = subject
         to = msg["To"] = convert_emails(expand, yaml_doc["to"])
         cc = msg["Cc"] = convert_emails(expand, yaml_doc["cc"])
+        bcc = msg["Bcc"] = convert_emails(expand, yaml_doc["bcc"])
         msg.set_content(body)
 
         if args.dry_run or args.verbose:
@@ -249,6 +251,7 @@ def main():
             print(f"Subject: {subject}")
             print(f"To: {', '.join(str(addr) for addr in to)}")
             print(f"Cc: {', '.join(str(addr) for addr in cc)}")
+            print(f"Bcc: {', '.join(str(addr) for addr in bcc)}")
             print(30 * "-")
             print(body)
 
