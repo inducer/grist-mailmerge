@@ -242,17 +242,20 @@ def main() -> None:
 
         msg = EmailMessage()
         msg["Subject"] = subject
-        to = msg["To"] = convert_emails(expand, yaml_doc["to"])
-        cc = msg["Cc"] = convert_emails(expand, yaml_doc["cc"])
-        bcc = msg["Bcc"] = convert_emails(expand, yaml_doc["bcc"])
+        to = msg["To"] = convert_emails(expand, yaml_doc.get("to"))
+        cc = msg["Cc"] = convert_emails(expand, yaml_doc.get("cc"))
+        bcc = msg["Bcc"] = convert_emails(expand, yaml_doc.get("bcc"))
         msg.set_content(body)
 
         if args.dry_run or args.verbose:
             print(75 * "#")
             print(f"Subject: {subject}")
-            print(f"To: {', '.join(str(addr) for addr in to)}")
-            print(f"Cc: {', '.join(str(addr) for addr in cc)}")
-            print(f"Bcc: {', '.join(str(addr) for addr in bcc)}")
+            if to:
+                print(f"To: {', '.join(str(addr) for addr in to)}")
+            if cc:
+                print(f"Cc: {', '.join(str(addr) for addr in cc)}")
+            if bcc:
+                print(f"Bcc: {', '.join(str(addr) for addr in bcc)}")
             print(30 * "-")
             print(body)
 
