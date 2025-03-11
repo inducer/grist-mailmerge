@@ -207,9 +207,6 @@ def main():
                     new_record[field] = exec_with_return(
                         code, f"<insert for '{tbl_name}.{field}'>", globals=globals)
                 row_table_to_inserts.setdefault(tbl_name, []).append(new_record)
-                table_to_inserts.setdefault(tbl_name, []).append(new_record)
-                if args.verbose or args.dry_run:
-                    print(f"INSERT {insert_descr['table'].text}", new_record)
 
         # }}}
 
@@ -221,11 +218,6 @@ def main():
                 globals = dict(row)
                 row_updates[field] = exec_with_return(
                     code, f"<update for '{field}'>", globals=globals)
-        if row_updates:
-            updates.append((row["id"], row_updates))
-
-        if row_updates and (args.verbose or args.dry_run):
-            print("UPDATE", row_updates)
 
         # }}}
 
@@ -263,6 +255,28 @@ def main():
         if not args.dry_run and not args.no_email:
             with Popen([args.sendmail, "-t", "-i"], stdin=PIPE) as p:
                 p.communicate(msg.as_bytes())
+
+                successful = p.returncode == 0
+        else:
+            successful = True
+
+        # {{{ add row database interactions to global structure
+
+        if successful:
+            if row_updates:
+                if args.verbose or args.dry_run:
+                    print("UPDATE", row_updates)
+
+                updates.append((row["id"], row_updates))
+
+            for tbl_name, records in row_table_to_inserts.items():
+                table_to_inserts.setdefault(tbl_name, []).extend(records)
+                for new_record in records:
+                    print(f"INSERT {tbl_name}", new_record)
+
+        # }}}
+
+        del successful
 
     if args.verbose:
         print(f"{nrows} rows considered.")
