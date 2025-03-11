@@ -9,16 +9,12 @@ from email.headerregistry import Address
 from email.message import EmailMessage
 from functools import partial
 from subprocess import PIPE, Popen
-from typing import TYPE_CHECKING, Any
+from typing import Any, Callable, Sequence
 
 from jinja2 import Environment, StrictUndefined
 from pygrist_mini import GristClient
 from strictyaml import Bool, Map, MapPattern, Optional, Seq, Str, load
 from zoneinfo import ZoneInfo
-
-
-if TYPE_CHECKING:
-    from datetime import timezone
 
 
 UTC  = ZoneInfo("UTC")
@@ -54,8 +50,8 @@ YAML_SCHEMA = Map({
     })
 
 
-def convert_email(expand, email_yml):
-    if email_yml.get("semicolon_separated", False):
+def convert_email(expand: Callable[[str], str], email_yml: dict) -> tuple[Address, ...]:
+    if email_yml.get("semicolon_separated"):
         emails = [email.strip()
             for email in expand(email_yml["email"].text).split(";")]
         if "name" not in email_yml:
@@ -79,7 +75,12 @@ def convert_email(expand, email_yml):
                 addr_spec=email),)
 
 
-def convert_emails(expand, emails_yml):
+def convert_emails(
+            expand: Callable[[str], str],
+            emails_yml: Sequence[dict] | None
+        ) -> tuple[Address, ...]:
+    if emails_yml is None:
+        return ()
     return tuple(
         addr
         for email_yml in emails_yml
@@ -118,14 +119,14 @@ def format_date_timestamp(
 def format_timestamp(
             tstamp: float,
             format: str = "%c",
-            timezone: timezone | None = None
+            timezone: ZoneInfo | None = None
         ) -> str:
     import datetime
     dt = datetime.datetime.fromtimestamp(tstamp, tz=timezone)
     return dt.strftime(format)
 
 
-def main():
+def main() -> None:
     parser = argparse.ArgumentParser(description="Email merge for Grist")
     parser.add_argument("filename", metavar="FILENAME.YML")
     parser.add_argument("parameters", metavar="PAR", nargs="*")
@@ -148,7 +149,7 @@ def main():
     env = Environment(undefined=StrictUndefined)
     if "timezone" in yaml_doc:
         from zoneinfo import ZoneInfo
-        from_ts = partial(
+        from_ts: Callable[[float, str], str] = partial(
                     format_timestamp,
                     timezone=ZoneInfo(yaml_doc["timezone"].text))
     else:
@@ -189,7 +190,7 @@ def main():
     body_template = env.from_string(yaml_doc["body"].text)
 
     table_to_inserts: dict[str, list[dict[str, Any]]] = {}
-    updates: list[tuple[str, Any]] = []
+    updates: list[tuple[int, dict[str, Any]]] = []
 
     nrows = 0
     for row in rows:
