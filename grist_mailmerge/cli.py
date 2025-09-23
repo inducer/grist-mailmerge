@@ -126,6 +126,15 @@ def format_timestamp(
     return dt.strftime(format)
 
 
+class Struct:
+    def __init__(self, **entries: object):
+        self.__dict__.update(entries)
+
+
+def sql_query(client: GristClient, query: str) -> Sequence[Struct]:
+    return [Struct(**row) for row in client.sql(query)]
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Email merge for Grist")
     parser.add_argument("filename", metavar="FILENAME.YML")
@@ -147,6 +156,7 @@ def main() -> None:
         api_key = inf.read().strip()
 
     env = Environment(undefined=StrictUndefined)
+
     if "timezone" in yaml_doc:
         from zoneinfo import ZoneInfo
         from_ts: Callable[[float, str], str] = partial(
@@ -163,6 +173,8 @@ def main() -> None:
             yaml_doc["grist_root_url"].text,
             api_key,
             yaml_doc["grist_doc_id"].text)
+
+    env.globals["q"] = partial(sql_query, client)
 
     query = yaml_doc["query"].text
 
