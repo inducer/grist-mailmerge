@@ -9,12 +9,13 @@ from email.headerregistry import Address
 from email.message import EmailMessage
 from functools import partial
 from subprocess import PIPE, Popen
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, ClassVar
 from zoneinfo import ZoneInfo
 
 from jinja2 import Environment, StrictUndefined
+from pydantic import BaseModel, ConfigDict, Field
 from pygrist_mini import GristClient
-from strictyaml import Bool, Map, MapPattern, Optional, Seq, Str, load
+from saneyaml import load
 
 
 if TYPE_CHECKING:
@@ -24,65 +25,69 @@ if TYPE_CHECKING:
 UTC  = ZoneInfo("UTC")
 
 
-_EMAIL_ADDR = Map({
-    Optional("name"): Str(),
-    "email": Str(),
-    Optional("semicolon_separated"): Bool(),
-})
-
-YAML_SCHEMA = Map({
-    "grist_root_url": Str(),
-    "grist_doc_id": Str(),
-    Optional("parameters"): Seq(Str()),
-    "query": Str(),
-    "subject": Str(),
-    "body": Str(),
-    Optional("update"): Map({
-        "table": Str(),
-        "fields": MapPattern(Str(), Str()),
-    }),
-    Optional("insert"): Seq(
-        Map({
-            "table": Str(),
-            "fields": MapPattern(Str(), Str()),
-        }),
-    ),
-    Optional("to"): Seq(_EMAIL_ADDR),
-    Optional("cc"): Seq(_EMAIL_ADDR),
-    Optional("bcc"): Seq(_EMAIL_ADDR),
-    Optional("timezone"): Str(),
-    })
+class EmailAddress(BaseModel):
+    model_config: ClassVar[ConfigDict] = ConfigDict(extra="forbid")
+    name: str | None = None
+    email: str
+    semicolon_separated: bool = False
 
 
-def convert_email(expand: Callable[[str], str], email_yml: dict) -> tuple[Address, ...]:
-    if email_yml.get("semicolon_separated"):
+class DatabaseRow(BaseModel):
+    model_config: ClassVar[ConfigDict] = ConfigDict(extra="forbid")
+
+    table: str
+    fields: dict[str, str]
+
+
+class EmailTemplate(BaseModel):
+    model_config: ClassVar[ConfigDict] = ConfigDict(extra="forbid")
+
+    grist_root_url: str
+    grist_doc_id: str
+    parameters: list[str] = Field(default_factory=list)
+    query: str
+    subject: str
+    body: str
+    update: DatabaseRow | None = None
+    insert: list[DatabaseRow] = Field(default_factory=list)
+    to: list[EmailAddress] = Field(default_factory=list)
+    cc: list[EmailAddress] = Field(default_factory=list)
+    bcc: list[EmailAddress] = Field(default_factory=list)
+    timezone: str | None = None
+
+
+def convert_email(
+            expand: Callable[[str], str],
+            email: EmailAddress
+        ) -> Sequence[Address]:
+    if email.semicolon_separated:
         emails = [email.strip()
-            for email in expand(email_yml["email"].text).split(";")]
-        if "name" not in email_yml:
+            for email in expand(email.email).split(";")]
+        if email.name is None:
             return tuple(Address(addr_spec=email) for email in emails if email)
         else:
-            names = expand(email_yml["name"].text).split(";")
+            names = expand(email.name).split(";")
             return tuple(
                 Address(name, addr_spec=email)
                 for name, email in zip(names, emails, strict=True) if email)
 
     else:
-        email = expand(email_yml["email"].text)
-        if not email:
+        expanded_addr = expand(email.email)
+        if not expanded_addr:
             return ()
 
-        if "name" not in email_yml:
-            return (Address(addr_spec=email),)
+        if email.name is None:
+            return (Address(addr_spec=expanded_addr),)
         else:
             return (Address(
-                expand(email_yml["name"].text),
-                addr_spec=email),)
+                expand(email.name),
+                addr_spec=expanded_addr),)
 
 
 def convert_emails(
             expand: Callable[[str], str],
-            emails_yml: Sequence[dict] | None
-        ) -> tuple[Address, ...]:
+            emails_yml: Sequence[EmailAddress] | None
+        ) -> Sequence[Address]:
     if emails_yml is None:
         return ()
     return tuple(
@@ -93,9 +98,11 @@ def convert_emails(
 
 # based on https://stackoverflow.com/a/76636602
 def exec_with_return(
-        code: str, location: str, globals: dict | None,
-        locals: dict | None = None,
-        ) -> Any:
+            code: str,
+            location: str,
+            globals: dict[str, object] | None,
+            locals: dict[str, object] | None = None,
+        ) -> object:
     a = ast.parse(code)
     last_expression = None
     if a.body:
@@ -154,59 +161,60 @@ def main() -> None:
     sys.path.append(os.path.dirname(os.path.abspath(args.filename)))
 
     with open(args.filename) as inf:
-        yaml_doc = load(inf.read(), YAML_SCHEMA)
+        email_tpl = EmailTemplate.model_validate(
+                                     load(inf.read(), allow_duplicate_keys=False))
 
     with open(args.api_key) as inf:
         api_key = inf.read().strip()
 
     env = Environment(undefined=StrictUndefined)
 
-    if "timezone" in yaml_doc:
+    if email_tpl.timezone is not None:
         from zoneinfo import ZoneInfo
         from_ts: Callable[[float, str], str] = partial(
                     format_timestamp,
-                    timezone=ZoneInfo(yaml_doc["timezone"].text))
+                    timezone=ZoneInfo(email_tpl.timezone))
     else:
         from warnings import warn
         warn("'timezone' key not specified, timestamps will be local", stacklevel=1)
         from_ts = format_timestamp
+
     env.filters["format_timestamp"] = from_ts
     env.filters["format_date_timestamp"] = format_date_timestamp
 
     client = GristClient(
-            yaml_doc["grist_root_url"].text,
+            email_tpl.grist_root_url,
             api_key,
-            yaml_doc["grist_doc_id"].text)
+            email_tpl.grist_doc_id)
 
-    env.globals["q"] = partial(sql_query, client)
+    env.globals["q"] = partial(sql_query, client)  # pyright: ignore[reportArgumentType]
 
-    query = yaml_doc["query"].text
+    query = email_tpl.query
 
-    if "parameters" in yaml_doc:
-        nrequired = len(yaml_doc["parameters"])
+    if email_tpl.parameters:
+        nrequired = len(email_tpl.parameters)
         nsupplied = len(args.parameters)
         if nrequired != nsupplied:
             raise ValueError(
                 f"{nrequired} parameters required, {nsupplied} supplied")
 
-        param_values = {name.text: value
-                        for name, value in zip(yaml_doc["parameters"],
+        param_values = dict(zip(email_tpl.parameters,
                                                args.parameters,
-                                               strict=True)}
+                                               strict=True))
         query = env.from_string(query).render(param_values)
     else:
         param_values = {}
 
     rows = client.sql(query)
 
-    def expand_template(context, tpl):
+    def expand_template(context: dict[str, object], tpl: str):
         return env.from_string(tpl).render(context)
 
-    subject_template = env.from_string(yaml_doc["subject"].text)
-    body_template = env.from_string(yaml_doc["body"].text)
+    subject_template = env.from_string(email_tpl.subject)
+    body_template = env.from_string(email_tpl.body)
 
-    table_to_inserts: dict[str, list[dict[str, Any]]] = {}
-    updates: list[tuple[int, dict[str, Any]]] = []
+    table_to_inserts: dict[str, list[dict[str, object]]] = {}
+    updates: list[tuple[int, dict[str, object]]] = []
 
     nrows = 0
     for row in rows:
@@ -214,25 +222,24 @@ def main() -> None:
 
         # {{{ compute inserts
 
-        row_table_to_inserts: dict[str, list[dict[str, Any]]] = {}
+        row_table_to_inserts: dict[str, list[dict[str, object]]] = {}
 
-        if "insert" in yaml_doc:
-            for insert_descr in yaml_doc["insert"]:
-                tbl_name = insert_descr["table"].text
-                new_record = {}
-                for field, code in insert_descr["fields"].data.items():
-                    globals = dict(row)
-                    new_record[field] = exec_with_return(
-                        code, f"<insert for '{tbl_name}.{field}'>", globals=globals)
-                row_table_to_inserts.setdefault(tbl_name, []).append(new_record)
+        for insert_descr in email_tpl.insert:
+            tbl_name = insert_descr.table
+            new_record = {}
+            for field, code in insert_descr.fields.items():
+                globals = dict(row)
+                new_record[field] = exec_with_return(
+                    code, f"<insert for '{tbl_name}.{field}'>", globals=globals)
+            row_table_to_inserts.setdefault(tbl_name, []).append(new_record)
 
         # }}}
 
         # {{{ compute row updates
 
-        row_updates: dict[str, Any] = {}
-        if "update" in yaml_doc:
-            for field, code in yaml_doc["update"]["fields"].data.items():
+        row_updates: dict[str, object] = {}
+        if email_tpl.update:
+            for field, code in email_tpl.update.fields.items():
                 globals = dict(row)
                 row_updates[field] = exec_with_return(
                     code, f"<update for '{field}'>", globals=globals)
@@ -258,9 +265,9 @@ def main() -> None:
 
         msg = EmailMessage()
         msg["Subject"] = subject
-        to = msg["To"] = convert_emails(expand, yaml_doc.get("to"))
-        cc = msg["Cc"] = convert_emails(expand, yaml_doc.get("cc"))
-        bcc = msg["Bcc"] = convert_emails(expand, yaml_doc.get("bcc"))
+        to = msg["To"] = convert_emails(expand, email_tpl.to)
+        cc = msg["Cc"] = convert_emails(expand, email_tpl.cc)
+        bcc = msg["Bcc"] = convert_emails(expand, email_tpl.bcc)
         msg.set_content(body)
 
         if args.dry_run or args.verbose:
@@ -309,8 +316,9 @@ def main() -> None:
             client.add_records(tbl, inserts)
 
     if updates and not args.dry_run:
+        assert email_tpl.update is not None
         client.patch_records(
-                yaml_doc["update"]["table"].text,
+                email_tpl.update.table,
                 updates)
 
 # vim: foldmethod=marker
