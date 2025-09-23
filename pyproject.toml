@@ -71,10 +71,17 @@ known-local-folder = [
 lines-after-imports = 2
 required-imports = ["from __future__ import annotations"]
 
-[tool.mypy]
 
-[[tool.mypy.overrides]]
-module = [
-    "strictyaml",
+[tool.basedpyright]
+reportImplicitStringConcatenation = "none"
+reportUnusedCallResult = "none"
+
+exclude = [
+    "build",
+    ".venv",
 ]
-ignore_missing_imports = true
+
+pythonVersion = "3.12"
+pythonPlatform = "All"
+
+

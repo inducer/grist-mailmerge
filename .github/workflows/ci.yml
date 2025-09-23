@@ -19,15 +19,14 @@ jobs:
                 pipx install ruff
                 ruff check
 
-    mypy:
+    basedpyright:
         runs-on: ubuntu-latest
         steps:
         -   uses: actions/checkout@v3
         -   uses: actions/setup-python@v4
         -   name: "Main Script"
             run: |
-                pip install mypy
-                pip install .
-                mypy grist_mailmerge
+                pip install basedpyright
+                basedpyright
 
 # vim: sw=4
