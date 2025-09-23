@@ -10,7 +10,7 @@ authors = [
 ]
 description = "Email merge for Grist databases, configured by YAML"
 readme = "README.md"
-requires-python = ">=3.8"
+requires-python = ">=3.12"
 license = "MIT"
 classifiers = [
     "Development Status :: 3 - Alpha",
@@ -23,6 +23,7 @@ dependencies = [
     "pygrist_mini ~=2025.1.1",
     "strictyaml ~=1.7.3",
     "jinja2 ~=3.1.2",
+    "pydantic ~=3.1.2",
 ]
 
 [project.scripts]

@@ -9,12 +9,16 @@ from email.headerregistry import Address
 from email.message import EmailMessage
 from functools import partial
 from subprocess import PIPE, Popen
-from typing import Any, Callable, Sequence
+from typing import TYPE_CHECKING, Any
+from zoneinfo import ZoneInfo
 
 from jinja2 import Environment, StrictUndefined
 from pygrist_mini import GristClient
 from strictyaml import Bool, Map, MapPattern, Optional, Seq, Str, load
-from zoneinfo import ZoneInfo
+
+
+if TYPE_CHECKING:
+    from collections.abc import Callable, Sequence
 
 
 UTC  = ZoneInfo("UTC")
