@@ -1,3 +1,15 @@
+#!/usr/bin/env -S uv run --script
+#
+# /// script
+# # NOTE: Keep consistent with pyproject.toml
+# dependencies = [
+#  "pygrist_mini ~=2025.1.1",
+#  "saneyaml ~=0.6.1",
+#  "jinja2 ~=3.1.2",
+#  "pydantic ~=2.11",
+# ]
+# ///
+
 from __future__ import annotations
 
 import argparse
