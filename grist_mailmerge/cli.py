@@ -333,4 +333,8 @@ def main() -> None:
                 email_tpl.update.table,
                 updates)
 
+
+if __name__ == "__main__":
+    main()
+
 # vim: foldmethod=marker
